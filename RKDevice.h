@@ -96,6 +96,7 @@ public:
 	int EraseAllBlocks(bool force_block_erase=false);
 	bool SetObject(CRKImage *pImage, CRKComm *pComm, CRKLog *pLog);
 	string GetLayerString(UINT dwLocationID);
+	STRUCT_FLASH_INFO GetFlashInfoStruct();
 	CRKDevice(STRUCT_RKDEVICE_DESC &device);
 	~CRKDevice();
 protected:

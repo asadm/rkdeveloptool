@@ -16,6 +16,11 @@
   <button id="list-btn">List devices</button>
   <input type="file" id="loader-file" accept=".bin" />
   <button id="download-btn">Download boot</button>
+  <button id="test-btn">Test device</button>
+  <button id="rid-btn">Read Flash ID</button>
+  <button id="rfi-btn">Read Flash Info</button>
+  <button id="rci-btn">Read Chip Info</button>
+  <button id="rcb-btn">Read Capability</button>
   <pre id="output">Waiting…</pre>
 
   <script type="module">
@@ -96,6 +101,90 @@
         const ok = Module.downloadBootBuffer(data);
 
         log(ok ? 'Downloading bootloader succeeded.' : 'Downloading bootloader failed.');
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
+      }
+    });
+
+    document.getElementById('test-btn').addEventListener('click', async () => {
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const ok = Module.testDevice();
+        log(ok ? 'TestDevice succeeded.' : 'TestDevice failed.');
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
+      }
+    });
+
+    document.getElementById('rid-btn').addEventListener('click', async () => {
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const id = await Module.readFlashId();
+        console.log('readFlashId result:', id);
+        if (!id || typeof id.length === 'undefined' || id.length === 0) {
+          log('ReadFlashID failed (likely requires loader mode).');
+          return;
+        }
+        log(`Flash ID: ${Array.from(id).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
+      }
+    });
+
+    document.getElementById('rfi-btn').addEventListener('click', async () => {
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const info = await Module.readFlashInfo();
+        console.log('readFlashInfo result:', info);
+        if (!info || info.manufacturer === undefined) {
+          log('ReadFlashInfo failed (likely requires loader mode).');
+          return;
+        }
+        log(`FlashInfo: manufacturer=${info.manufacturer}, size=${info.flashSizeMiB}MiB, block=${info.blockSize}, page=${info.pageSize}, blocks=${info.blockCount}, eccBits=${info.eccBits}, accessTime=${info.accessTime}, flashCs=${info.flashCs}, validSecPerBlock=${info.validSectorsPerBlock}`);
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
+      }
+    });
+
+    document.getElementById('rci-btn').addEventListener('click', async () => {
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const chip = await Module.readChipInfo();
+        console.log('readChipInfo result:', chip);
+        if (!chip || typeof chip.length === 'undefined' || chip.length === 0) {
+          log('ReadChipInfo failed (likely requires loader mode).');
+          return;
+        }
+        log(`ChipInfo: ${Array.from(chip).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
+      }
+    });
+
+    document.getElementById('rcb-btn').addEventListener('click', async () => {
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const cap = await Module.readCapability();
+        console.log('readCapability result:', cap);
+        if (!cap) {
+          log('ReadCapability failed.');
+          return;
+        }
+        if (cap.rawFlag === undefined) {
+          log('ReadCapability returned empty result (likely requires loader mode).');
+          return;
+        }
+        log(`Capability: directLba=${cap.directLba} first4mAccess=${cap.first4mAccess} rawFlag=0x${cap.rawFlag.toString(16)}`);
       } catch (err) {
         console.error(err);
         log(`Error: ${err}`);

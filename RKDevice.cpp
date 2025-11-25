@@ -194,6 +194,13 @@ CRKDevice::~CRKDevice()
 		m_pFlashInfoData = NULL;
 	}
 }
+STRUCT_FLASH_INFO CRKDevice::GetFlashInfoStruct()
+{
+	if (m_pLog) {
+		m_pLog->Record("<LAYER %s> INFO:GetFlashInfoStruct size=%uMiB block=%u page=%u cs=%u", m_layerName, m_flashInfo.uiFlashSize, m_flashInfo.usBlockSize, m_flashInfo.uiPageSize, m_flashInfo.bFlashCS);
+	}
+	return m_flashInfo;
+}
 bool CRKDevice::SetObject(CRKImage *pImage, CRKComm *pComm, CRKLog *pLog)
 {
 	if (!pComm) {
