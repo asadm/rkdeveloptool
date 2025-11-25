@@ -810,6 +810,7 @@ int CRKUsbComm::RKU_WriteSector(DWORD dwPos, DWORD dwCount, BYTE *lpBuffer)
 
 int CRKUsbComm::RKU_DeviceRequest(DWORD dwRequest, BYTE *lpBuffer, DWORD dwDataSize)
 {
+	printf("[RKU_DeviceRequest] req=0x%x size=%u\n", dwRequest, dwDataSize); fflush(stdout);
 	if (m_deviceDesc.emUsbType != RKUSB_MASKROM) {
 	    if (m_log) {
 	        m_log->Record("Error:RKU_DeviceRequest failed,device not support");
@@ -858,6 +859,7 @@ int CRKUsbComm::RKU_DeviceRequest(DWORD dwRequest, BYTE *lpBuffer, DWORD dwDataS
 			if (m_log) {
 				m_log->Record("Error:RKU_DeviceRequest-->DeviceRequest vendor=0x%x failed, err=%d",dwRequest, iRet);
 			}
+			printf("[RKU_DeviceRequest] req=0x%x transfer failed ret=%d\n", dwRequest, iRet); fflush(stdout);
 			delete []pData;
 			return ERR_REQUEST_FAIL;
 		}
@@ -871,14 +873,15 @@ int CRKUsbComm::RKU_DeviceRequest(DWORD dwRequest, BYTE *lpBuffer, DWORD dwDataS
 			if (m_log) {
 				m_log->Record("Error:RKU_DeviceRequest-->DeviceRequest vendor=0x%x failed, err=%d", dwRequest, iRet);
 			}
+			printf("[RKU_DeviceRequest] req=0x%x pend packet failed ret=%d\n", dwRequest, iRet); fflush(stdout);
 			delete []pData;
 			return ERR_REQUEST_FAIL;
 		}
 	}
 
+	printf("[RKU_DeviceRequest] req=0x%x completed\n", dwRequest); fflush(stdout);
 	delete []pData;
 
-    return ERR_SUCCESS;
+	return ERR_SUCCESS;
 }
-
 

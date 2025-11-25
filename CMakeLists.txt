@@ -47,6 +47,10 @@ add_library(libusb_static STATIC
 )
 
 if(EMSCRIPTEN)
+    target_compile_options(libusb_static PRIVATE -pthread)
+endif()
+
+if(EMSCRIPTEN)
     set(libusb_config_dir ${CMAKE_CURRENT_SOURCE_DIR}/libusb/emscripten)
 else()
     set(libusb_config_dir ${CMAKE_CURRENT_SOURCE_DIR}/libusb/Xcode)
@@ -71,16 +75,22 @@ add_executable(${PROJECT_NAME} ${LOCAL_CPP_FILES})
 
 # Emscripten link options for the final binary.
 if(EMSCRIPTEN)
+    set(EM_COMPILE_PTHREAD_FLAGS "-pthread")
     set(EM_LINK_FLAGS
+        "-pthread"
+        "-sUSE_PTHREADS=1"
         "-sASYNCIFY"
         "-sALLOW_MEMORY_GROWTH=1"
         "-sMODULARIZE=1"
         "-sEXPORT_NAME=createModule"
         "-sEXPORT_ES6=1"
         "-sENVIRONMENT=web"
+        "-sFORCE_FILESYSTEM=1"
+        "-sEXPORTED_RUNTIME_METHODS=['FS','PATH']"
         "--bind"
     )
     target_link_options(${PROJECT_NAME} PRIVATE ${EM_LINK_FLAGS})
+    target_compile_options(${PROJECT_NAME} PRIVATE ${EM_COMPILE_PTHREAD_FLAGS})
 endif()
 
 target_include_directories(${PROJECT_NAME}

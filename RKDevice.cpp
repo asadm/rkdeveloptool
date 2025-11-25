@@ -513,13 +513,17 @@ int CRKDevice::DownloadBoot()
 	DWORD dwSize, dwDelay;
 	PBYTE pBuffer = NULL;
 	for ( i = 0; i < m_pImage->m_bootObject->Entry471Count; i++ ) {
+		if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry471 idx=%d", m_layerName, i);
 		if ( !m_pImage->m_bootObject->GetEntryProperty(ENTRY471, i, dwSize, dwDelay) ) {
 			if (m_pLog) {
 				m_pLog->Record("<LAYER %s> ERROR:DownloadBoot-->GetEntry471Property failed,index(%d)", m_layerName, i);
 			}
 			return -2;
 		}
+		if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry471 idx=%d size=%u delay=%u", m_layerName, i, dwSize, dwDelay);
+		printf("[DownloadBoot] Entry471 idx=%d size=%u delay=%u\n", i, dwSize, dwDelay); fflush(stdout);
 		if (dwSize>0) {
+			if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry471 idx=%d alloc buffer", m_layerName, i);
 			pBuffer = new BYTE[dwSize];
 			if ( !m_pImage->m_bootObject->GetEntryData(ENTRY471, i, pBuffer) ) {
 				if (m_pLog) {
@@ -528,6 +532,8 @@ int CRKDevice::DownloadBoot()
 				delete []pBuffer;
 				return -3;
 			}
+			if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry471 idx=%d vendor request", m_layerName, i);
+			printf("[DownloadBoot] Entry471 idx=%d vendor request\n", i); fflush(stdout);
 			if ( !Boot_VendorRequest(0x0471,pBuffer,dwSize) ) {
 				if (m_pLog) {
 					m_pLog->Record("<LAYER %s> ERROR:DownloadBoot-->Boot_VendorRequest471 failed,index(%d)", m_layerName, i);
@@ -535,9 +541,13 @@ int CRKDevice::DownloadBoot()
 				delete []pBuffer;
 				return -4;
 			}
+			if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry471 idx=%d done", m_layerName, i);
+			printf("[DownloadBoot] Entry471 idx=%d done\n", i); fflush(stdout);
 			delete []pBuffer;
 			pBuffer = NULL;
 			if (dwDelay>0) {
+				if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry471 idx=%d delay %u ms", m_layerName, i, dwDelay);
+				printf("[DownloadBoot] Entry471 idx=%d delay %u ms\n", i, dwDelay); fflush(stdout);
 				usleep(dwDelay * 1000);
 			}
 
@@ -545,13 +555,17 @@ int CRKDevice::DownloadBoot()
 	}
 
 	for ( i=0; i < m_pImage->m_bootObject->Entry472Count; i++ ) {
+		if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry472 idx=%d", m_layerName, i);
 		if ( !m_pImage->m_bootObject->GetEntryProperty(ENTRY472, i, dwSize, dwDelay) ) {
 			if (m_pLog) {
 				m_pLog->Record("<LAYER %s> ERROR:DownloadBoot-->GetEntry472Property failed,index(%d)", m_layerName, i);
 			}
 			return -2;
 		}
+		if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry472 idx=%d size=%u delay=%u", m_layerName, i, dwSize, dwDelay);
+		printf("[DownloadBoot] Entry472 idx=%d size=%u delay=%u\n", i, dwSize, dwDelay); fflush(stdout);
 		if (dwSize > 0) {
+			if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry472 idx=%d alloc buffer", m_layerName, i);
 			pBuffer = new BYTE[dwSize];
 			if ( !m_pImage->m_bootObject->GetEntryData(ENTRY472, i, pBuffer) ) {
 				if (m_pLog) {
@@ -560,6 +574,8 @@ int CRKDevice::DownloadBoot()
 				delete []pBuffer;
 				return -3;
 			}
+			if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry472 idx=%d vendor request", m_layerName, i);
+			printf("[DownloadBoot] Entry472 idx=%d vendor request\n", i); fflush(stdout);
 			if ( !Boot_VendorRequest(0x0472, pBuffer, dwSize) ) {
 				if (m_pLog) {
 					m_pLog->Record("<LAYER %s> ERROR:DownloadBoot-->Boot_VendorRequest472 failed,index(%d)", m_layerName, i);
@@ -567,13 +583,19 @@ int CRKDevice::DownloadBoot()
 				delete []pBuffer;
 				return -4;
 			}
+			if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry472 idx=%d done", m_layerName, i);
+			printf("[DownloadBoot] Entry472 idx=%d done\n", i); fflush(stdout);
 			delete []pBuffer;
 			pBuffer = NULL;
 			if (dwDelay > 0) {
+				if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: Entry472 idx=%d delay %u ms", m_layerName, i, dwDelay);
+				printf("[DownloadBoot] Entry472 idx=%d delay %u ms\n", i, dwDelay); fflush(stdout);
 				usleep(dwDelay * 1000);
 			}
 		}
 	}
+	printf("[DownloadBoot] finished all entries\n"); fflush(stdout);
+	if (m_pLog) m_pLog->Record("<LAYER %s> DownloadBoot: finished all entries", m_layerName);
 	sleep(1);
 	return 0;
 
@@ -671,5 +693,3 @@ bool CRKDevice::ReadCapability()
 		m_bFirst4mAccess = false;
 	return true;
 }
-
-

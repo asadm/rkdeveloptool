@@ -11,9 +11,11 @@
 </head>
 <body>
   <h1>rkdeveloptool WebUSB demo</h1>
-  <p>Click “List devices” to enumerate Rockchip USB devices (requires user gesture and a WebUSB-enabled browser).</p>
+  <p>Click “Grant USB access” to authorize, then “List devices” to view Rockchip devices. Use “Download boot” to send a loader (.bin) to a maskrom device.</p>
   <button id="request-btn">Grant USB access</button>
   <button id="list-btn">List devices</button>
+  <input type="file" id="loader-file" accept=".bin" />
+  <button id="download-btn">Download boot</button>
   <pre id="output">Waiting…</pre>
 
   <script type="module">
@@ -32,6 +34,11 @@
       output.textContent = msg;
       console.log(msg);
     };
+
+    async function readFileAsUint8Array(file) {
+      const buf = await file.arrayBuffer();
+      return new Uint8Array(buf);
+    }
 
     document.getElementById('request-btn').addEventListener('click', async () => {
       try {
@@ -67,6 +74,28 @@
           (d) => `DevNo=${d.devNo} Vid=0x${d.vid.toString(16)} Pid=0x${d.pid.toString(16)} LocationID=${d.locationId} ${d.type}`
         );
         log(lines.join('\n'));
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
+      }
+    });
+
+    document.getElementById('download-btn').addEventListener('click', async () => {
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const fileInput = document.getElementById('loader-file');
+        if (!fileInput.files || fileInput.files.length === 0) {
+          log('Select a loader .bin file first.');
+          return;
+        }
+        const file = fileInput.files[0];
+        const data = await readFileAsUint8Array(file);
+
+        log(`Downloading bootloader (${file.name})…`);
+        const ok = Module.downloadBootBuffer(data);
+
+        log(ok ? 'Downloading bootloader succeeded.' : 'Downloading bootloader failed.');
       } catch (err) {
         console.error(err);
         log(`Error: ${err}`);

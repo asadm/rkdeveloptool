@@ -4,8 +4,17 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <sys/stat.h>
+#include <fstream>
 
 #include "RKScan.h"
+#include "RKComm.h"
+#include "RKDevice.h"
+#include "RKImage.h"
+#include "RKLog.h"
+
+extern CRKLog *g_pLogObject;
+extern bool download_boot(STRUCT_RKDEVICE_DESC &dev, char *szLoader);
 
 struct DeviceInfo {
 	int devNo;
@@ -15,10 +24,8 @@ struct DeviceInfo {
 	std::string type;
 };
 
-namespace {
 bool g_vid_pid_set = false;
 CRKScan g_scan;
-} // namespace
 
 static std::vector<DeviceInfo> list_devices()
 {
@@ -77,6 +84,62 @@ static emscripten::val list_devices_js()
 	return emscripten::val::array(list_devices());
 }
 
+static bool perform_download_boot(const std::string &loader_path)
+{
+	mkdir("/tmp", 0777);
+
+	/* Ensure fresh permission state */
+	libusb_exit(nullptr);
+	if (libusb_init(nullptr) < 0)
+		return false;
+	if (!g_vid_pid_set) {
+		g_scan.SetVidPid();
+		g_vid_pid_set = true;
+	}
+
+	int found = g_scan.Search(RKUSB_MASKROM | RKUSB_LOADER | RKUSB_MSC);
+	emscripten_log(EM_LOG_CONSOLE, "rkdeveloptool: downloadBoot search found %d devices", found);
+	if (found < 1)
+		return false;
+
+	STRUCT_RKDEVICE_DESC dev;
+	if (!g_scan.GetDevice(dev, 0))
+		return false;
+
+	struct stat st;
+	if (stat(loader_path.c_str(), &st) != 0) {
+		emscripten_log(EM_LOG_CONSOLE, "rkdeveloptool: stat failed on %s (errno=%d)", loader_path.c_str(), errno);
+		return false;
+	} else {
+		emscripten_log(EM_LOG_CONSOLE, "rkdeveloptool: loader %s size=%lld", loader_path.c_str(), (long long)st.st_size);
+	}
+
+	/* Use existing CLI helper; expects mutable char* */
+	std::string path = loader_path;
+	return download_boot(dev, path.data());
+}
+
+static bool download_boot_js(const std::string &loader_path)
+{
+	return perform_download_boot(loader_path);
+}
+
+static bool download_boot_buffer_js(const emscripten::val &dataVal)
+{
+	std::vector<uint8_t> data = emscripten::vecFromJSArray<uint8_t>(dataVal);
+	std::string path = "/tmp/loader.bin";
+
+	std::ofstream ofs(path.c_str(), std::ios::binary | std::ios::trunc);
+	if (!ofs.good())
+		return false;
+	ofs.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
+	ofs.close();
+
+	bool ok = perform_download_boot(path);
+	unlink(path.c_str());
+	return ok;
+}
+
 EMSCRIPTEN_BINDINGS(rkdeveloptool_wasm_api) {
 	emscripten::value_object<DeviceInfo>("DeviceInfo")
 		.field("devNo", &DeviceInfo::devNo)
@@ -88,5 +151,7 @@ EMSCRIPTEN_BINDINGS(rkdeveloptool_wasm_api) {
 	emscripten::register_vector<DeviceInfo>("DeviceInfoVector");
 	emscripten::function("listDevices", &list_devices);
 	emscripten::function("listDevicesJs", &list_devices_js);
+	emscripten::function("downloadBoot", &download_boot_js);
+	emscripten::function("downloadBootBuffer", &download_boot_buffer_js);
 }
 #endif
