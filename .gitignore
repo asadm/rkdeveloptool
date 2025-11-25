@@ -9,3 +9,5 @@ config.status
 configure
 rkdeveloptool
 rkdeveloptool*bz2
+build
+build-wasm

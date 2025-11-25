@@ -1,0 +1,97 @@
+diff --git a/libusb/os/emscripten_time.c b/libusb/os/emscripten_time.c
+new file mode 100644
+index 00000000..8dd1f438
+--- /dev/null
++++ b/libusb/os/emscripten_time.c
+@@ -0,0 +1,12 @@
++#include "libusbi.h"
++#include <time.h>
++
++void usbi_get_monotonic_time(struct timespec *tp)
++{
++	clock_gettime(CLOCK_MONOTONIC, tp);
++}
++
++void usbi_get_real_time(struct timespec *tp)
++{
++	clock_gettime(CLOCK_REALTIME, tp);
++}
+diff --git a/libusb/os/events_posix.c b/libusb/os/events_posix.c
+index bf984b91..9e7e2b74 100644
+--- a/libusb/os/events_posix.c
++++ b/libusb/os/events_posix.c
+@@ -30,13 +30,8 @@
+ #endif
+ 
+ #ifdef __EMSCRIPTEN__
+-/* On Emscripten `pipe` does not conform to the spec and does not block
+- * until events are available, which makes it unusable for event system
+- * and often results in deadlocks when `pipe` is in a loop like it is
+- * in libusb.
+- *
+- * Therefore use a custom event system based on browser event emitters. */
+ #include <emscripten.h>
++#if defined(__EMSCRIPTEN_PTHREADS__)
+ #include <emscripten/atomic.h>
+ #include <emscripten/threading.h>
+ 
+@@ -52,6 +47,12 @@ static void em_libusb_wait(const _Atomic int *ptr, int expected_value, int timeo
+ 		emscripten_atomic_wait_u32((int*)ptr, expected_value, 1000000LL * timeout);
+ 	}
+ }
++#else
++static void em_libusb_wait(const int *ptr, int expected_value, int timeout)
++{
++	(void)ptr; (void)expected_value; (void)timeout;
++}
++#endif
+ #endif
+ #include <unistd.h>
+ 
+@@ -156,9 +157,11 @@ void usbi_signal_event(usbi_event_t *event)
+ 	r = write(EVENT_WRITE_FD(event), &dummy, sizeof(dummy));
+ 	if (r != sizeof(dummy))
+ 		usbi_warn(NULL, "event write failed");
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__) && defined(__EMSCRIPTEN_PTHREADS__)
+ 	event->has_event = 1;
+ 	emscripten_atomic_notify(&event->has_event, EMSCRIPTEN_NOTIFY_ALL_WAITERS);
++#elif defined(__EMSCRIPTEN__)
++	event->has_event = 1;
+ #endif
+ }
+ 
+@@ -170,7 +173,7 @@ void usbi_clear_event(usbi_event_t *event)
+ 	r = read(EVENT_READ_FD(event), &dummy, sizeof(dummy));
+ 	if (r != sizeof(dummy))
+ 		usbi_warn(NULL, "event read failed");
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__)
+ 	event->has_event = 0;
+ #endif
+ }
+@@ -255,7 +258,7 @@ int usbi_wait_for_events(struct libusb_context *ctx,
+ 	int internal_fds, num_ready;
+ 
+ 	usbi_dbg(ctx, "poll() %u fds with timeout in %dms", (unsigned int)nfds, timeout_ms);
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__) && defined(__EMSCRIPTEN_PTHREADS__)
+ 	/* Emscripten's poll doesn't actually block, so we need to use an
+ 	 * out-of-band waiting signal. */
+ 	em_libusb_wait(&ctx->event.has_event, 0, timeout_ms);
+diff --git a/libusb/os/events_posix.h b/libusb/os/events_posix.h
+index 4bd7f0fa..d78b94ed 100644
+--- a/libusb/os/events_posix.h
++++ b/libusb/os/events_posix.h
+@@ -36,8 +36,10 @@ typedef struct usbi_event {
+ #else
+ typedef struct usbi_event {
+ 	int pipefd[2];
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__) && defined(__EMSCRIPTEN_PTHREADS__)
+ 	_Atomic int has_event;
++#elif defined(__EMSCRIPTEN__)
++	int has_event;
+ #endif
+ } usbi_event_t;
+ #define USBI_EVENT_OS_HANDLE(e)	((e)->pipefd[0])
