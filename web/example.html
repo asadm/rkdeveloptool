@@ -58,7 +58,7 @@
           log('Enter a reset subcode between 0 and 255.');
           return;
         }
-        const ok = Module.resetDevice(sub);
+        const ok = await Module.resetDevice(sub);
         log(ok ? `ResetDevice (subcode ${sub}) sent.` : 'ResetDevice failed.');
       } catch (err) {
         console.error(err);
@@ -129,7 +129,7 @@
         const data = await readFileAsUint8Array(file);
 
         log(`Downloading bootloader (${file.name})…`);
-        const ok = Module.downloadBootBuffer(data);
+        const ok = await Module.downloadBootBuffer(data);
 
         log(ok ? 'Downloading bootloader succeeded.' : 'Downloading bootloader failed.');
       } catch (err) {
@@ -157,7 +157,7 @@
         const data = await readFileAsUint8Array(file);
 
         log(`Writing ${file.name} (${data.byteLength} bytes) starting at LBA ${begin}…`);
-        const ok = Module.writeLba(begin, data);
+        const ok = await Module.writeLba(begin, data);
         log(ok ? 'WriteLBA complete.' : 'WriteLBA failed (check that the device is in loader/maskrom mode).');
       } catch (err) {
         console.error(err);
@@ -169,7 +169,7 @@
       log('Loading WASM…');
       const Module = await modulePromise;
       try {
-        const ok = Module.testDevice();
+        const ok = await Module.testDevice();
         log(ok ? 'TestDevice succeeded.' : 'TestDevice failed.');
       } catch (err) {
         console.error(err);

@@ -55,7 +55,7 @@ struct PartitionInfo {
 
 bool g_vid_pid_set = false;
 CRKScan g_scan;
-static constexpr uint32_t DEFAULT_RW_LBA = 128;
+static constexpr uint32_t DEFAULT_RW_LBA = 32; // smaller chunks to reduce USB transfer pressure
 
 static std::vector<DeviceInfo> list_devices()
 {
