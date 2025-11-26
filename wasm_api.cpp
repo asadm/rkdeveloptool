@@ -6,8 +6,9 @@
 #include <cstdint>
 #include <sys/stat.h>
 #include <fstream>
+#include <algorithm>
+#include <cstring>
 #include <functional>
-#include <vector>
 
 #include "RKScan.h"
 #include "RKComm.h"
@@ -54,6 +55,7 @@ struct PartitionInfo {
 
 bool g_vid_pid_set = false;
 CRKScan g_scan;
+static constexpr uint32_t DEFAULT_RW_LBA = 128;
 
 static std::vector<DeviceInfo> list_devices()
 {
@@ -217,6 +219,44 @@ static bool download_boot_buffer_js(const emscripten::val &dataVal)
 	return ok;
 }
 
+static bool write_lba_js(uint32_t beginSector, const emscripten::val &dataVal)
+{
+	std::vector<uint8_t> data = emscripten::vecFromJSArray<uint8_t>(dataVal);
+	if (data.empty()) {
+		emscripten_log(EM_LOG_CONSOLE, "rkdeveloptool: writeLba received empty buffer");
+		return false;
+	}
+
+	bool ok = with_device([&](CRKDevice *dev) {
+		auto *comm = dev->GetCommObjectPointer();
+		size_t offset = 0;
+		uint32_t lba = beginSector;
+		const size_t chunkBytes = static_cast<size_t>(DEFAULT_RW_LBA) * SECTOR_SIZE;
+
+		while (offset < data.size()) {
+			size_t remaining = data.size() - offset;
+			size_t bytesThis = std::min(chunkBytes, remaining);
+			uint32_t sectors = static_cast<uint32_t>((bytesThis + SECTOR_SIZE - 1) / SECTOR_SIZE);
+			std::vector<uint8_t> chunk(sectors * SECTOR_SIZE, 0);
+			memcpy(chunk.data(), data.data() + offset, bytesThis);
+
+			int ret = comm->RKU_WriteLBA(lba, sectors, chunk.data());
+			if (ret != ERR_SUCCESS) {
+				emscripten_log(EM_LOG_CONSOLE, "rkdeveloptool: writeLba failed at lba=%u ret=%d", lba, ret);
+				return false;
+			}
+			offset += bytesThis;
+			lba += sectors;
+		}
+		return true;
+	});
+
+	if (!ok)
+		emscripten_log(EM_LOG_CONSOLE, "rkdeveloptool: writeLba failed");
+
+	return ok;
+}
+
 static emscripten::val read_flash_id_js()
 {
 	std::vector<uint8_t> id(5, 0);
@@ -377,6 +417,18 @@ static bool erase_flash_js()
 	return ok;
 }
 
+static bool reset_device_js(uint8_t subcode)
+{
+	bool ok = with_device([&](CRKDevice *dev) {
+		int ret = dev->GetCommObjectPointer()->RKU_ResetDevice(subcode);
+		if (ret != ERR_SUCCESS) {
+			emscripten_log(EM_LOG_CONSOLE, "rkdeveloptool: resetDevice failed ret=%d subcode=%u", ret, subcode);
+		}
+		return ret == ERR_SUCCESS;
+	});
+	return ok;
+}
+
 EMSCRIPTEN_BINDINGS(rkdeveloptool_wasm_api) {
 	emscripten::value_object<DeviceInfo>("DeviceInfo")
 		.field("devNo", &DeviceInfo::devNo)
@@ -390,6 +442,7 @@ EMSCRIPTEN_BINDINGS(rkdeveloptool_wasm_api) {
 	emscripten::function("listDevicesJs", &list_devices_js);
 	emscripten::function("downloadBoot", &download_boot_js);
 	emscripten::function("downloadBootBuffer", &download_boot_buffer_js);
+	emscripten::function("writeLba", &write_lba_js);
 	emscripten::function("readFlashId", &read_flash_id_js);
 	emscripten::function("readFlashInfo", &read_flash_info_js);
 	emscripten::function("readChipInfo", &read_chip_info_js);
@@ -397,5 +450,6 @@ EMSCRIPTEN_BINDINGS(rkdeveloptool_wasm_api) {
 	emscripten::function("testDevice", &test_device_js);
 	emscripten::function("printPartitions", &print_partitions_js);
 	emscripten::function("eraseFlash", &erase_flash_js);
+	emscripten::function("resetDevice", &reset_device_js);
 }
 #endif

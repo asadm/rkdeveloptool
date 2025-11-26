@@ -75,12 +75,21 @@ add_executable(${PROJECT_NAME} ${LOCAL_CPP_FILES})
 
 # Emscripten link options for the final binary.
 if(EMSCRIPTEN)
+    foreach(var CMAKE_C_FLAGS CMAKE_CXX_FLAGS CMAKE_EXE_LINKER_FLAGS)
+        if(DEFINED ${var})
+            string(REPLACE "-sALLOW_MEMORY_GROWTH=1" "" _sanitized "${${var}}")
+            set(${var} "${_sanitized}" CACHE STRING "" FORCE)
+        endif()
+    endforeach()
+
     set(EM_COMPILE_PTHREAD_FLAGS "-pthread")
     set(EM_LINK_FLAGS
         "-pthread"
         "-sUSE_PTHREADS=1"
         "-sASYNCIFY"
-        "-sALLOW_MEMORY_GROWTH=1"
+        "-sASYNCIFY_STACK_SIZE=524288"
+        "-sSTACK_SIZE=1048576"
+        "-sINITIAL_MEMORY=268435456"
         "-sMODULARIZE=1"
         "-sEXPORT_NAME=createModule"
         "-sEXPORT_ES6=1"

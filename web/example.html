@@ -11,12 +11,23 @@
 </head>
 <body>
   <h1>rkdeveloptool WebUSB demo</h1>
-  <p>Click “Grant USB access” to authorize, then “List devices” to view Rockchip devices. Use “Download boot” to send a loader (.bin) to a maskrom device.</p>
+  <p>Click “Grant USB access” to authorize, then “List devices” to view Rockchip devices. Use “Download boot” to send a loader (.bin) to a maskrom device, or “Write LBA” to flash a file starting at a specific sector (requires loader/maskrom mode).</p>
   <button id="request-btn">Grant USB access</button>
   <button id="list-btn">List devices</button>
   <input type="file" id="loader-file" accept=".bin" />
   <button id="download-btn">Download boot</button>
+  <div style="margin-top:0.5rem;">
+    <label for="wl-begin">Begin LBA:</label>
+    <input type="number" id="wl-begin" min="0" step="1" value="0" style="width:8rem;">
+    <input type="file" id="wl-file" />
+    <button id="write-btn">Write LBA</button>
+  </div>
   <button id="test-btn">Test device</button>
+  <div style="margin-top:0.5rem;">
+    <label for="reset-subcode">Reset subcode:</label>
+    <input type="number" id="reset-subcode" min="0" max="255" step="1" value="0" style="width:6rem;">
+    <button id="reset-btn">Reset device</button>
+  </div>
   <button id="rid-btn">Read Flash ID</button>
   <button id="rfi-btn">Read Flash Info</button>
   <button id="rci-btn">Read Chip Info</button>
@@ -34,6 +45,24 @@
       locateFile: (path) => {
         if (path.endsWith('.wasm')) return './rkDevelopTool_Mac.wasm';
         return path;
+      }
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', async () => {
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const subInput = document.getElementById('reset-subcode');
+        const sub = parseInt(subInput.value, 10);
+        if (!Number.isFinite(sub) || sub < 0 || sub > 255) {
+          log('Enter a reset subcode between 0 and 255.');
+          return;
+        }
+        const ok = Module.resetDevice(sub);
+        log(ok ? `ResetDevice (subcode ${sub}) sent.` : 'ResetDevice failed.');
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
       }
     });
 
@@ -103,6 +132,33 @@
         const ok = Module.downloadBootBuffer(data);
 
         log(ok ? 'Downloading bootloader succeeded.' : 'Downloading bootloader failed.');
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
+      }
+    });
+
+    document.getElementById('write-btn').addEventListener('click', async () => {
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const beginInput = document.getElementById('wl-begin');
+        const begin = parseInt(beginInput.value, 10);
+        if (!Number.isFinite(begin) || begin < 0) {
+          log('Enter a valid begin sector (>=0).');
+          return;
+        }
+        const fileInput = document.getElementById('wl-file');
+        if (!fileInput.files || fileInput.files.length === 0) {
+          log('Select an image file to flash.');
+          return;
+        }
+        const file = fileInput.files[0];
+        const data = await readFileAsUint8Array(file);
+
+        log(`Writing ${file.name} (${data.byteLength} bytes) starting at LBA ${begin}…`);
+        const ok = Module.writeLba(begin, data);
+        log(ok ? 'WriteLBA complete.' : 'WriteLBA failed (check that the device is in loader/maskrom mode).');
       } catch (err) {
         console.error(err);
         log(`Error: ${err}`);
