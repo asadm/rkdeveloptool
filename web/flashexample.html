@@ -15,20 +15,29 @@
   <h1>rkdeveloptool Flash Helper (WebUSB)</h1>
   <p>Drop all extracted images (<code>*.img</code>) plus your loader (<code>*.bin</code>). This tool will parse <code>env.img</code> for the <code>mtdparts</code> string, validate required files, load the loader, flash each partition by LBA, and finally reset the device.</p>
 
-  <div>
-    <button id="request-btn">Grant USB access</button>
-    <button id="list-btn">List devices</button>
-    <button id="parse-btn">Parse mtdparts</button>
-    <button id="load-btn">Load loader</button>
-    <button id="info-btn">Read flash info</button>
-    <button id="flash-btn">Flash partitions</button>
-    <button id="reset-btn">Reset device</button>
+  <h2>Simple wizard</h2>
+  <div style="margin-bottom:0.5rem;">
+    <button id="wiz-device-btn">Select device (Maskrom/Loader)</button>
+    <button id="wiz-flash-btn">Flash device</button>
   </div>
 
   <div id="dropzone">
     <p>Drop files here or select: <input type="file" id="file-input" multiple></p>
     <div id="files" class="file-list"></div>
   </div>
+
+  <details id="advanced" style="margin-top:1rem;">
+    <summary>Advanced controls</summary>
+    <div style="margin-top:0.5rem;">
+      <button id="request-btn">Grant USB access</button>
+      <button id="list-btn">List devices</button>
+      <button id="parse-btn">Parse mtdparts</button>
+      <button id="load-btn">Load loader</button>
+      <button id="info-btn">Read flash info</button>
+      <button id="flash-btn">Flash partitions</button>
+      <button id="reset-btn">Reset device</button>
+    </div>
+  </details>
 
   <pre id="output">Waiting…</pre>
 
@@ -48,6 +57,7 @@
     let cachedParts = null;
     let cachedLoader = null;
     let cachedLoaderName = '';
+    let wizardPermission = false;
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const log = (msg) => {
@@ -203,6 +213,125 @@
       return false;
     }
 
+    async function ensureUsbPermission() {
+      try {
+        const allowed = await navigator.usb.getDevices();
+        if (allowed.some(d => d.vendorId === 0x2207 || d.vendorId === 0x071B)) {
+          wizardPermission = true;
+          return true;
+        }
+      } catch (_) {}
+      try {
+        await navigator.usb.requestDevice({ filters: [{ vendorId: 0x2207 }, { vendorId: 0x071B }] });
+        wizardPermission = true;
+        return true;
+      } catch (err) {
+        log(`Permission denied or error: ${err.message || err}`);
+        return false;
+      }
+    }
+
+    async function flashWizard() {
+      log('Starting flash wizard…');
+      const Module = await modulePromise;
+
+      const okPerm = await ensureUsbPermission();
+      if (!okPerm) return;
+
+      const missing = [];
+      for (const r of requiredImgs) {
+        if (!findImageForName(r)) missing.push(r);
+      }
+      if (missing.length) {
+        log(`Missing required images: ${missing.join(', ')}`);
+        return;
+      }
+      let loaderBuf;
+      let loaderName;
+      try {
+        const loader = await ensureLoaderBuffer();
+        loaderBuf = loader.data;
+        loaderName = loader.name;
+      } catch (err) {
+        log(err.message || String(err));
+        return;
+      }
+
+      let parts;
+      try {
+        parts = await ensureParts();
+      } catch (err) {
+        log(err.message || String(err));
+        return;
+      }
+      const needed = requiredImgs.filter(n => parts.find(p => p.name.toLowerCase() === n));
+      append(`Found mtdparts: ${parts.map(p => `${p.name}@${p.startLba}`).join(', ')}`);
+
+      try {
+        let info = await Module.readFlashInfo();
+        if (!info || info.flashSizeMiB === undefined) {
+          append('ReadFlashInfo empty; attempting to load loader…');
+          append(`Loading loader ${loaderName}…`);
+          const dlOk = await Module.downloadBootBuffer(loaderBuf);
+          if (!dlOk) {
+            log('downloadBoot failed. Aborting.');
+            return;
+          }
+          append('Loader loaded, waiting for device to enumerate…');
+          const dev = await waitForDevice(Module, ['loader', 'maskrom'], 20, 500);
+          if (!dev) {
+            log('Loader loaded but device not detected.');
+            return;
+          }
+          append(`Device present (${dev.type}).`);
+          info = await Module.readFlashInfo();
+        }
+        if (info && info.flashSizeMiB !== undefined) {
+          append(`FlashInfo: manufacturer=${info.manufacturer} size=${info.flashSizeMiB}MiB`);
+        } else {
+          log('ReadFlashInfo returned empty result. Aborting.');
+          return;
+        }
+      } catch (err) {
+        log(`ReadFlashInfo failed (${err?.message || err}). Aborting.`);
+        return;
+      }
+
+      for (const part of parts) {
+        const nameLower = part.name.toLowerCase();
+        const f = findImageForName(nameLower);
+        if (!f) {
+          append(`Skipping ${part.name} (no matching image).`);
+          continue;
+        }
+        if (!needed.includes(nameLower)) {
+          append(`Skipping ${part.name} (not in required list).`);
+          continue;
+        }
+        const data = await readFileAsUint8Array(f);
+        append(`Writing ${part.name} (${data.byteLength} bytes) @ LBA ${part.startLba}…`);
+        try {
+          const ok = await Module.writeLba(part.startLba, data);
+          if (!ok) {
+            log(`WriteLBA failed for ${part.name}. Aborting.`);
+            return;
+          }
+        } catch (err) {
+          log(`WriteLBA threw for ${part.name}: ${err?.message || err}. Aborting.`);
+          return;
+        }
+      }
+
+      append('Issuing reset…');
+      try {
+        const ok = await Module.resetDevice(0);
+        append(ok ? 'ResetDevice sent.' : 'ResetDevice failed.');
+      } catch (err) {
+        append(`ResetDevice error: ${err}`);
+      }
+      append('Flash sequence complete.');
+    }
+
     async function flashAll() {
       log('Loading WASM…');
       const Module = await modulePromise;
@@ -284,6 +413,17 @@
       }
       append('Flash sequence complete.');
     }
+
+    document.getElementById('wiz-device-btn').addEventListener('click', async () => {
+      await ensureUsbPermission();
+      if (wizardPermission) log('Permission granted (or already granted). Ready to flash.');
+    });
+
+    document.getElementById('wiz-flash-btn').addEventListener('click', () => {
+      flashWizard().catch(err => {
+        log(`Error: ${err.message || err}`);
+      });
+    });
 
     document.getElementById('request-btn').addEventListener('click', async () => {
       try {
