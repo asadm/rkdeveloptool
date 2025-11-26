@@ -21,6 +21,8 @@
   <button id="rfi-btn">Read Flash Info</button>
   <button id="rci-btn">Read Chip Info</button>
   <button id="rcb-btn">Read Capability</button>
+  <button id="ppt-btn">Print partitions</button>
+  <button id="erase-btn" style="color:red;">Erase flash (DANGER)</button>
   <pre id="output">Waiting…</pre>
 
   <script type="module">
@@ -185,6 +187,38 @@
           return;
         }
         log(`Capability: directLba=${cap.directLba} first4mAccess=${cap.first4mAccess} rawFlag=0x${cap.rawFlag.toString(16)}`);
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
+      }
+    });
+
+    document.getElementById('ppt-btn').addEventListener('click', async () => {
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const parts = await Module.printPartitions();
+        console.log('printPartitions result:', parts);
+        if (!parts || !parts.length) {
+          log('PrintPartition failed (likely requires loader mode).');
+          return;
+        }
+        const lines = parts.map((p) => `#${p.index} LBA=${p.startLba} ${p.name}`);
+        log(lines.join('\n'));
+      } catch (err) {
+        console.error(err);
+        log(`Error: ${err}`);
+      }
+    });
+
+    document.getElementById('erase-btn').addEventListener('click', async () => {
+      const confirmErase = window.confirm('This will ERASE the entire flash. Are you sure?');
+      if (!confirmErase) return;
+      log('Loading WASM…');
+      const Module = await modulePromise;
+      try {
+        const ok = await Module.eraseFlash();
+        log(ok ? 'Erase flash complete.' : 'Erase flash failed.');
       } catch (err) {
         console.error(err);
         log(`Error: ${err}`);

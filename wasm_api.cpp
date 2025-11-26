@@ -7,12 +7,14 @@
 #include <sys/stat.h>
 #include <fstream>
 #include <functional>
+#include <vector>
 
 #include "RKScan.h"
 #include "RKComm.h"
 #include "RKDevice.h"
 #include "RKImage.h"
 #include "RKLog.h"
+#include "gpt.h"
 
 extern CRKLog *g_pLogObject;
 extern bool download_boot(STRUCT_RKDEVICE_DESC &dev, char *szLoader);
@@ -42,6 +44,12 @@ struct CapabilityInfo {
 	bool directLba;
 	bool first4mAccess;
 	uint8_t rawFlag;
+};
+
+struct PartitionInfo {
+	int index;
+	uint32_t startLba;
+	std::string name;
 };
 
 bool g_vid_pid_set = false;
@@ -312,6 +320,63 @@ static bool test_device_js()
 	return ok;
 }
 
+static emscripten::val print_partitions_js()
+{
+	std::vector<PartitionInfo> parts;
+	bool ok = with_device([&](CRKDevice *dev) {
+		std::vector<uint8_t> master(34 * SECTOR_SIZE, 0);
+		int ret = dev->GetCommObjectPointer()->RKU_ReadLBA(0, 34, master.data());
+		if (ret != ERR_SUCCESS)
+			return false;
+
+		gpt_header *gptHead = (gpt_header *)(master.data() + SECTOR_SIZE);
+		if (gptHead->signature != le64_to_cpu(GPT_HEADER_SIGNATURE))
+			return false;
+
+		gpt_entry *gptEntry = nullptr;
+		uint8_t zerobuf[GPT_ENTRY_SIZE];
+		memset(zerobuf, 0, GPT_ENTRY_SIZE);
+		for (uint32_t i = 0; i < le32_to_cpu(gptHead->num_partition_entries); i++) {
+			gptEntry = (gpt_entry *)(master.data() + 2 * SECTOR_SIZE + i * GPT_ENTRY_SIZE);
+			if (memcmp(zerobuf, (uint8_t *)gptEntry, GPT_ENTRY_SIZE) == 0)
+				break;
+			PartitionInfo p{};
+			p.index = static_cast<int>(i);
+			p.startLba = (uint32_t)le64_to_cpu(gptEntry->starting_lba);
+			char partName[36] = {0};
+			uint32_t j = 0;
+			while (gptEntry->partition_name[j] && j < sizeof(partName) - 1) {
+				partName[j] = (char)gptEntry->partition_name[j];
+				j++;
+			}
+			p.name = partName;
+			parts.push_back(p);
+		}
+		return true;
+	});
+	if (!ok) return emscripten::val::null();
+	emscripten::val arr = emscripten::val::array();
+	for (size_t i = 0; i < parts.size(); ++i) {
+		emscripten::val obj = emscripten::val::object();
+		obj.set("index", parts[i].index);
+		obj.set("startLba", parts[i].startLba);
+		obj.set("name", parts[i].name);
+		arr.call<void>("push", obj);
+	}
+	return arr;
+}
+
+static bool erase_flash_js()
+{
+	bool ok = with_device([&](CRKDevice *dev) {
+		if (!dev->GetFlashInfo())
+			return false;
+		int ret = dev->EraseAllBlocks();
+		return ret == 0;
+	});
+	return ok;
+}
+
 EMSCRIPTEN_BINDINGS(rkdeveloptool_wasm_api) {
 	emscripten::value_object<DeviceInfo>("DeviceInfo")
 		.field("devNo", &DeviceInfo::devNo)
@@ -330,5 +395,7 @@ EMSCRIPTEN_BINDINGS(rkdeveloptool_wasm_api) {
 	emscripten::function("readChipInfo", &read_chip_info_js);
 	emscripten::function("readCapability", &read_capability_js);
 	emscripten::function("testDevice", &test_device_js);
+	emscripten::function("printPartitions", &print_partitions_js);
+	emscripten::function("eraseFlash", &erase_flash_js);
 }
 #endif
