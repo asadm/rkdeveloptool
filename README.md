@@ -41,6 +41,6 @@ console.log('Flash info:', info);
 
 ## License
 
-WASM parts (wasm_api.cpp) licensed under the Apache License, Version 2.0.
-rkDevelopTool originally licensed under GNU General Public License.
-libusb licensed under GNU LESSER GENERAL PUBLIC LICENSE Version 2.1.
+- WASM parts (wasm_api.cpp) licensed under the Apache License, Version 2.0.
+- rkDevelopTool originally licensed under GNU General Public License.
+- libusb licensed under GNU LESSER GENERAL PUBLIC LICENSE Version 2.1.
