@@ -106,9 +106,10 @@
     function findMtdpartsString(data) {
       // Decode as Latin-1 to preserve byte-for-byte text without dropping high-bit chars.
       const raw = new TextDecoder('latin1', { fatal: false }).decode(data);
-      let m = raw.match(/mtdparts=[^\s\x00"']+/i);
+      let m = raw.match(/(?:mtdparts|blkdevparts)=[^\s\x00"']+/i);
       if (m) {
-        console.log('Found mtdparts (latin1) at offset', raw.toLowerCase().indexOf('mtdparts'));
+        const off = raw.toLowerCase().search(/(?:mtdparts|blkdevparts)/);
+        console.log('Found mtd/blkdev parts (latin1) at offset', off);
         return m[0];
       }
       console.log('latin1 scan: no mtdparts');
@@ -119,9 +120,9 @@
         const code = dv.getUint16(i, true);
         utf16 += (code >= 0x20 && code <= 0x7e) ? String.fromCharCode(code) : ' ';
       }
-      m = utf16.match(/mtdparts=[^\s"]+/i);
+      m = utf16.match(/(?:mtdparts|blkdevparts)=[^\s"]+/i);
       if (m) {
-        console.log('Found mtdparts (utf16le)');
+        console.log('Found mtd/blkdev parts (utf16le)');
         return m[0];
       }
       console.log('UTF16 scan: no mtdparts');
@@ -129,7 +130,7 @@
     }
 
     function parseMtdparts(str) {
-      const m = str.match(/mtdparts=([^\s]+)/i);
+      const m = str.match(/(?:mtdparts|blkdevparts)=([^\s]+)/i);
       if (!m) return null;
       const spec = m[1];
       const colon = spec.indexOf(':');
