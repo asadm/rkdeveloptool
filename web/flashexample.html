@@ -214,6 +214,22 @@
       return false;
     }
 
+    async function eraseFlashWithLog(Module) {
+      append('Erasing flash…');
+      try {
+        const ok = await Module.eraseFlash();
+        if (!ok) {
+          log('Erase flash failed. Aborting.');
+          return false;
+        }
+        append('Erase flash complete.');
+        return true;
+      } catch (err) {
+        log(`Erase flash error: ${err?.message || err}. Aborting.`);
+        return false;
+      }
+    }
+
     async function ensureUsbPermission() {
       try {
         const allowed = await navigator.usb.getDevices();
@@ -298,6 +314,9 @@
         return;
       }
 
+      const erased = await eraseFlashWithLog(Module);
+      if (!erased) return;
+
       for (const part of parts) {
         const nameLower = part.name.toLowerCase();
         const f = findImageForName(nameLower);
@@ -377,6 +396,9 @@
         log(`ReadFlashInfo failed (${err?.message || err}). Aborting.`);
         return;
       }
+
+      const erased = await eraseFlashWithLog(Module);
+      if (!erased) return;
 
       // Flash partitions
       for (const part of parts) {
