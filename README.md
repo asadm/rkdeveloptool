@@ -4,6 +4,10 @@
 
 All exported WASM APIs are async (Asyncify-instrumented). Always `await` calls before reading results.
 
+<p align="center">
+  <img src="preview.png" alt="rkdeveloptool browser wizard" style="max-width: 500px; width: 100%; height: auto;" />
+</p>
+
 ## Working APIs
 - `await Module.listDevicesJs()`: returns an array of `{ devNo, vid, pid, locationId, type }` for Maskrom/Loader/MSC devices.
 - `await Module.downloadBootBuffer(uint8Array) -> bool`: sends a loader to a Maskrom device; accepts a `Uint8Array` of the loader.
