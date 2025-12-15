@@ -27,8 +27,8 @@ if [[ ! -f "${JS_OUT}" || ! -f "${WASM_OUT}" ]]; then
   exit 1
 fi
 
-mkdir -p web
-cp "${JS_OUT}" "web/${TARGET}.js"
-cp "${WASM_OUT}" "web/${TARGET}.wasm"
+mkdir -p docs
+cp "${JS_OUT}" "docs/${TARGET}.js"
+cp "${WASM_OUT}" "docs/${TARGET}.wasm"
 
-echo ">> Artifacts copied to web/ (serve manually; ensure .wasm uses application/wasm)"
+echo ">> Artifacts copied to docs/ (serve manually; ensure .wasm uses application/wasm)"
