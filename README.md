@@ -1,6 +1,6 @@
 # rkDevelopTooljs: Rockchip flashing in the browser
 
-`rkDevelopTool` ported to WASM via libusb's WebUSB backend; runs entirely in the browser. I have tested this with Luckfox boards and custom PCBs with RV1103 and RV1106 from empty flash to a fully booting system using only the browser. But this should work with any Rockchip SoC supported by rkDevelopTool. Just load the page, connect your device in Maskrom mode (usually hold boot and connect to USB), and follow the wizard.
+`rkDevelopTool` ported to WASM via libusb's WebUSB backend; runs entirely in the browser. I have tested this with [Luckfox Pico](https://www.luckfox.com/Luckfox-Pico/Luckfox-Pico-Mini-A) boards and custom PCBs with RV1103 and RV1106 from fresh empty flash to a fully booting system using only the browser. But this should work with any Rockchip SoC supported by rkDevelopTool. Just load the page, connect your device in Maskrom mode (usually hold boot and connect to USB), drop your firmware files and follow the wizard.
 All exported WASM APIs are async (Asyncify-instrumented). Always `await` calls before reading results.
 
 ## Why
@@ -50,6 +50,13 @@ console.log('Flash info:', info);
 - `Module.downloadBoot(pathString)`: file-path based loader download (expects a writable FS path); use `downloadBootBuffer` in the browser instead.
 - `Module.listDevices()`: legacy C++ vector return; `listDevicesJs` is preferred for JS.
 - Additional helpers (read LBA, partial erase, progress callbacks) could be layered on top of existing primitives.
+
+## Contributing
+- Clone with submodules: `git clone --recurse-submodules https://github.com/asadm/rkdeveloptool.git` (add `-j8` if you want parallel submodule fetches).
+- Apply patches: `./apply_patches.sh`.
+- Build the WASM artifacts: `./run.sh`.
+- Serve and use the browser UI: `cd docs && python -m http.server 8000` then visit `http://localhost:8000/`.
+- A cheap test target like the [Luckfox Pico Mini A](https://www.luckfox.com/Luckfox-Pico/Luckfox-Pico-Mini-A) works well for verifying WebUSB flashing end-to-end.
 
 ## License
 
