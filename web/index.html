@@ -78,6 +78,27 @@
       font-family: Menlo, Consolas, "Courier New", monospace;
       font-size: 13px;
     }
+    .info-media-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 8px 0 14px;
+      align-items: flex-start;
+    }
+    .info-media-row img,
+    .info-media-row iframe {
+      flex: 1 1 320px;
+      max-width: 100%;
+      border: 1px solid #d0d0d0;
+    }
+    .info-media-row iframe {
+      min-height: 220px;
+      background: #000;
+    }
+    .info-media-row a {
+      display: block;
+      line-height: 0;
+    }
     .info-content h4 {
       margin: 8px 0 4px;
       font-size: 17px;
@@ -344,6 +365,10 @@
           <div class="info-content">
           <h4><a href="https://github.com/asadm/rkdeveloptool" target="_blank" rel="noreferrer noopener">rkDevelopTooljs: Rockchip flashing in the browser</a></h4>
           <p><code>rkDevelopTool</code> ported to WASM via libusb's WebUSB backend; runs entirely in the browser. Tested with Luckfox boards and custom PCBs with RV1103 and RV1106 from empty flash to a fully booting system using only the browser. Should work with any Rockchip SoC supported by rkDevelopTool. Load the page, connect your device in Maskrom mode (usually hold boot and connect to USB), and follow the wizard. All exported WASM APIs are async (Asyncify-instrumented). Always <code>await</code> calls before reading results.</p>
+
+          <div class="info-media-row">
+            <iframe width="100%" height="400" src="https://www.youtube.com/embed/wphVfUbxc6o?si=WjXhA4HJJkVeBBLc" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+          </div>
 
           <h4>Why</h4>
           <p>I wanted an easy way for users of my <a href="https://x.com/_asadmemon/status/1989417143398797424" target="_blank" rel="noreferrer noopener">Embedded SLAM Camera</a> to flash their boards without installing software. This project is a step towards that goal.</p>

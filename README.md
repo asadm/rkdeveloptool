@@ -6,10 +6,15 @@ All exported WASM APIs are async (Asyncify-instrumented). Always `await` calls b
 ## Why
 I wanted to develop an easy way for users of my [Embedded SLAM Camera](https://x.com/_asadmemon/status/1989417143398797424) to flash their boards without installing any software. This project is a step towards that goal.
 
+## Preview
 
-<p align="center">
+[Here](https://www.youtube.com/watch?v=wphVfUbxc6o) is a demo video showing the wizard in action.
+
+<a href="https://www.youtube.com/watch?v=wphVfUbxc6o" target="_blank" rel="noreferrer noopener">
   <img src="preview.png" alt="rkdeveloptool browser wizard" style="max-width: 500px; width: 100%; height: auto;" />
-</p>
+</a>
+
+## Demo Video
 
 ## Working APIs
 - `await Module.listDevicesJs()`: returns an array of `{ devNo, vid, pid, locationId, type }` for Maskrom/Loader/MSC devices.
