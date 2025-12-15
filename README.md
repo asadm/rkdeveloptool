@@ -1,8 +1,11 @@
-# rkDevelopTooljs
+# rkDevelopTooljs: Rockchip flashing in the browser
 
-`rkDevelopTool` ported to WASM via libusb's WebUSB backend; runs entirely in the browser. Tested to flash RV1103/RV1106 from empty flash to a fully booting system using only the browser.
-
+`rkDevelopTool` ported to WASM via libusb's WebUSB backend; runs entirely in the browser. I have tested this with Luckfox boards and custom PCBs with RV1103 and RV1106 from empty flash to a fully booting system using only the browser. But this should work with any Rockchip SoC supported by rkDevelopTool. Just load the page, connect your device in Maskrom mode (usually hold boot and connect to USB), and follow the wizard.
 All exported WASM APIs are async (Asyncify-instrumented). Always `await` calls before reading results.
+
+## Why
+I wanted to develop an easy way for users of my [Embedded SLAM Camera](https://x.com/_asadmemon/status/1989417143398797424) to flash their boards without installing any software. This project is a step towards that goal.
+
 
 <p align="center">
   <img src="preview.png" alt="rkdeveloptool browser wizard" style="max-width: 500px; width: 100%; height: auto;" />

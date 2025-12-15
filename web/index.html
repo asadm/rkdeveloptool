@@ -16,14 +16,81 @@
       min-height: 100vh;
       background: var(--win98-bg);
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 12px;
       padding: 16px;
       font-family: "MS Sans Serif", "Microsoft Sans Serif", Arial, sans-serif;
     }
-    .wizard-window {
+    .wizard-window,
+    .info-window {
       width: 860px;
       max-width: calc(100vw - 20px);
+    }
+    .info-window .window-body {
+      background: #d8d8d8;
+    }
+    .info-browser {
+      border: 1px solid #b4b4b4;
+      background: #fff;
+      box-shadow: inset 0 1px 0 #f8f8f8;
+    }
+    .info-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      background: linear-gradient(#f4f4f4, #e5e5e5);
+      border-bottom: 1px solid #b4b4b4;
+    }
+    .info-badge {
+      width: 16px;
+      height: 16px;
+      border: 1px solid #9a9a9a;
+      background: linear-gradient(#fff, #c9e3ff);
+    }
+    .info-address {
+      flex: 1;
+      padding: 4px 6px;
+      border: 1px solid #9a9a9a;
+      background: #fff;
+      font-family: "MS Sans Serif", "Microsoft Sans Serif", Arial, sans-serif;
+      font-size: 12px;
+      color: #333;
+    }
+    .info-content {
+      padding: 12px 14px 16px;
+      background: #fff;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #111;
+    }
+    .info-content pre {
+      background: #f7f7f7;
+      border: 1px solid #d0d0d0;
+      padding: 10px 12px;
+      overflow: auto;
+      max-width: 100%;
+    }
+    .info-content code {
+      font-family: Menlo, Consolas, "Courier New", monospace;
+      font-size: 13px;
+    }
+    .info-content h4 {
+      margin: 8px 0 4px;
+      font-size: 17px;
+    }
+    .info-content p {
+      margin: 0 0 10px;
+    }
+    .info-content ul {
+      margin: 0 0 12px 18px;
+      padding: 0;
+    }
+    .info-window.hidden {
+      display: none;
     }
     .wizard-body {
       display: grid;
@@ -158,7 +225,8 @@
       .wizard-body {
         grid-template-columns: 1fr;
       }
-      .wizard-window {
+      .wizard-window,
+      .info-window {
         width: 100%;
       }
     }
@@ -258,6 +326,76 @@
     </div>
   </div>
 
+  <div class="window info-window" id="info-window">
+    <div class="title-bar">
+      <div class="title-bar-text">What is this?</div>
+      <div class="title-bar-controls">
+        <button aria-label="Minimize"></button>
+        <button aria-label="Maximize"></button>
+        <button aria-label="Close"></button>
+      </div>
+    </div>
+    <div class="window-body">
+        <div class="info-browser">
+          <div class="info-toolbar">
+            <div class="info-badge"></div>
+            <div class="info-address">https://github.com/asadm/rkdeveloptool</div>
+          </div>
+          <div class="info-content">
+          <h4><a href="https://github.com/asadm/rkdeveloptool" target="_blank" rel="noreferrer noopener">rkDevelopTooljs: Rockchip flashing in the browser</a></h4>
+          <p><code>rkDevelopTool</code> ported to WASM via libusb's WebUSB backend; runs entirely in the browser. Tested with Luckfox boards and custom PCBs with RV1103 and RV1106 from empty flash to a fully booting system using only the browser. Should work with any Rockchip SoC supported by rkDevelopTool. Load the page, connect your device in Maskrom mode (usually hold boot and connect to USB), and follow the wizard. All exported WASM APIs are async (Asyncify-instrumented). Always <code>await</code> calls before reading results.</p>
+
+          <h4>Why</h4>
+          <p>I wanted an easy way for users of my <a href="https://x.com/_asadmemon/status/1989417143398797424" target="_blank" rel="noreferrer noopener">Embedded SLAM Camera</a> to flash their boards without installing software. This project is a step towards that goal.</p>
+
+          <h4>Working APIs</h4>
+          <ul>
+            <li><code>await Module.listDevicesJs()</code>: returns an array of <code>{ devNo, vid, pid, locationId, type }</code> for Maskrom/Loader/MSC devices.</li>
+            <li><code>await Module.downloadBootBuffer(uint8Array) -&gt; bool</code>: sends a loader to a Maskrom device; accepts a <code>Uint8Array</code> of the loader.</li>
+            <li><code>await Module.readFlashInfo() -&gt; { manufacturer, flashSizeMiB, blockSize, pageSize, blockCount, eccBits, accessTime, flashCs, validSectorsPerBlock } | null</code>: probes flash info (requires Loader/Maskrom).</li>
+            <li><code>await Module.readFlashId() -&gt; Uint8Array | null</code>: reads the flash ID.</li>
+            <li><code>await Module.readChipInfo() -&gt; Uint8Array | null</code>: reads chip info.</li>
+            <li><code>await Module.readCapability() -&gt; { directLba, first4mAccess, rawFlag } | null</code>: reads device capabilities.</li>
+            <li><code>await Module.printPartitions() -&gt; Array&lt;{ index, startLba, name }&gt;</code>: reads partition table (GPT) if available.</li>
+            <li><code>await Module.writeLba(beginSector: number, data: Uint8Array) -&gt; bool</code>: writes data starting at LBA; uses chunked transfers internally.</li>
+            <li><code>await Module.eraseFlash() -&gt; bool</code>: erases the entire flash (dangerous).</li>
+            <li><code>await Module.resetDevice(subcode: number) -&gt; bool</code>: resets the device with a subcode (commonly <code>0</code>).</li>
+            <li><code>await Module.testDevice() -&gt; bool</code>: basic connectivity test.</li>
+          </ul>
+
+          <h4>Minimal usage example</h4>
+          <pre><code>import createModule from './rkDevelopTool_Mac.js';
+
+const Module = await createModule({ noInitialRun: true });
+await navigator.usb.requestDevice({ filters: [{ vendorId: 0x2207 }, { vendorId: 0x071B }] });
+const devs = await Module.listDevicesJs();
+console.log('Devices:', Array.from(devs || []));
+
+const loaderData = await fetch('/path/to/loader.bin').then(r =&gt; r.arrayBuffer()).then(buf =&gt; new Uint8Array(buf));
+const okBoot = await Module.downloadBootBuffer(loaderData);
+if (!okBoot) throw new Error('downloadBootBuffer failed');
+
+const info = await Module.readFlashInfo();
+console.log('Flash info:', info);</code></pre>
+
+          <h4>TODO / unverified</h4>
+          <ul>
+            <li><code>Module.downloadBoot(pathString)</code>: file-path based loader download (expects a writable FS path); use <code>downloadBootBuffer</code> in the browser instead.</li>
+            <li><code>Module.listDevices()</code>: legacy C++ vector return; <code>listDevicesJs</code> is preferred for JS.</li>
+            <li>Additional helpers (read LBA, partial erase, progress callbacks) could be layered on top of existing primitives.</li>
+          </ul>
+
+          <h4>License</h4>
+          <ul>
+            <li>WASM parts (wasm_api.cpp, web/) licensed under the Apache License, Version 2.0.</li>
+            <li>rkDevelopTool originally licensed under GNU General Public License.</li>
+            <li>libusb licensed under GNU LESSER GENERAL PUBLIC LICENSE Version 2.1.</li>
+          </ul>
+          </div>
+        </div>
+      </div>
+  </div>
+
   <script type="module">
     import createModule from './rkDevelopTool_Mac.js';
 
@@ -278,6 +416,7 @@
     const successBanner = document.getElementById('success-banner');
     const restartBtn = document.getElementById('restart-btn');
     const wizardSteps = document.querySelectorAll('.wizard-step');
+    const infoWindow = document.getElementById('info-window');
     const modulePromise = createModule({
       noInitialRun: true,
       locateFile: (path) => path.endsWith('.wasm') ? './rkDevelopTool_Mac.wasm' : path
@@ -324,6 +463,7 @@
         el.classList.toggle('hidden', i !== currentStepIdx);
       });
       setStepActive(stepOrder[currentStepIdx]);
+      if (infoWindow) infoWindow.classList.toggle('hidden', currentStepIdx !== 0);
       updateNavButtons();
     }
 
