@@ -1,6 +1,6 @@
 # rkDevelopTooljs: Rockchip flashing in the browser
 
-`rkDevelopTool` ported to WASM via libusb's WebUSB backend; runs entirely in the browser. I have tested this with [Luckfox Pico](https://www.luckfox.com/Luckfox-Pico/Luckfox-Pico-Mini-A) boards and custom PCBs with RV1103 and RV1106 from fresh empty flash to a fully booting system using only the browser. But this should work with any Rockchip SoC supported by rkDevelopTool. Just load the page, connect your device in Maskrom mode (usually hold boot and connect to USB), drop your firmware files and follow the wizard.
+`rkDevelopTool` ported to WASM via libusb's WebUSB backend; runs entirely in the browser. I have tested this with [Luckfox Pico](https://www.luckfox.com/Luckfox-Pico/Luckfox-Pico-Mini-A) boards and custom PCBs with RV1103 and RV1106 from fresh empty flash to a fully booting system using only the browser. But this should work with any Rockchip SoC supported by rkDevelopTool. Just load the page, connect your device in Maskrom mode (usually hold boot and connect to USB), drop your firmware files and follow the wizard. WebUSB support means this only works in Chrome-based browsers; see [caniuse.com/webusb](https://caniuse.com/webusb).
 All exported WASM APIs are async (Asyncify-instrumented). Always `await` calls before reading results.
 
 ## Why

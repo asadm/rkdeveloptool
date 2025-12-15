@@ -378,6 +378,7 @@
           <div class="info-content">
           <h4><a href="https://github.com/asadm/rkdeveloptool" target="_blank" rel="noreferrer noopener">rkDevelopTooljs: Rockchip flashing in the browser</a></h4>
           <p><code>rkDevelopTool</code> ported to WASM via libusb's WebUSB backend; runs entirely in the browser. Tested with Luckfox boards and custom PCBs with RV1103 and RV1106 from empty flash to a fully booting system using only the browser. Should work with any Rockchip SoC supported by rkDevelopTool. Load the page, connect your device in Maskrom mode (usually hold boot and connect to USB), and follow the wizard. All exported WASM APIs are async (Asyncify-instrumented). Always <code>await</code> calls before reading results.</p>
+          <p>Requires a Chrome-based browser with WebUSB enabled; see <a href="https://caniuse.com/webusb" target="_blank" rel="noreferrer noopener">caniuse.com/webusb</a>.</p>
 
           <div class="info-media-row">
             <iframe width="100%" height="400" src="https://www.youtube.com/embed/wphVfUbxc6o?si=WjXhA4HJJkVeBBLc" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
