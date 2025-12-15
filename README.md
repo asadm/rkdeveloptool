@@ -14,7 +14,6 @@ I wanted to develop an easy way for users of my [Embedded SLAM Camera](https://x
   <img src="preview.png" alt="rkdeveloptool browser wizard" style="max-width: 500px; width: 100%; height: auto;" />
 </a>
 
-## Demo Video
 
 ## Working APIs
 - `await Module.listDevicesJs()`: returns an array of `{ devNo, vid, pid, locationId, type }` for Maskrom/Loader/MSC devices.
