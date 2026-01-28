@@ -654,6 +654,14 @@ console.log('Flash info:', info);</code></pre>
       return null;
     }
 
+    function getImageFiles() {
+      const imgs = [];
+      for (const [key, f] of fileMap.entries()) {
+        if (key.endsWith('.img')) imgs.push(f);
+      }
+      return imgs;
+    }
+
     function findLoader() {
       const binFiles = [...fileMap.values()].filter(f => f.name.toLowerCase().endsWith('.bin'));
       return binFiles[0] || null;
@@ -813,17 +821,29 @@ console.log('Flash info:', info);</code></pre>
       setStepDone('flash', false);
       const Module = await modulePromise;
 
+      const imgFiles = getImageFiles();
+      const useMerged = imgFiles.length === 1;
+      const mergedImg = useMerged ? imgFiles[0] : null;
       let parts;
-      try {
-        parts = await ensureParts();
-      } catch (err) {
-        log(err.message || String(err));
-        return;
+      let needed = [];
+      if (!useMerged) {
+        try {
+          parts = await ensureParts();
+        } catch (err) {
+          log(err.message || String(err));
+          return;
+        }
+        needed = requiredImgs.filter(n => parts.find(p => p.name.toLowerCase() === n));
       }
-      const needed = requiredImgs.filter(n => parts.find(p => p.name.toLowerCase() === n));
-      const totalSteps = 6 + needed.length + 1; // permission, parse, validate, loader ready, read info, erase, per part, reset
+      const totalSteps = useMerged
+        ? 6 // merged detect, permission, loader ready, loader loaded, write, reset
+        : 6 + needed.length + 1; // permission, parse, validate, loader ready, read info, erase, per part, reset
       resetProgress(totalSteps, 'Starting…');
-      completeProgress('Parsed mtdparts');
+      if (useMerged) {
+        completeProgress(`Single image detected (${mergedImg.name})`);
+      } else {
+        completeProgress('Parsed mtdparts');
+      }
 
       const okPerm = await ensureUsbPermission();
       if (!okPerm) {
@@ -832,16 +852,18 @@ console.log('Flash info:', info);</code></pre>
       }
       completeProgress('USB permission granted');
 
-      const missing = [];
-      for (const r of requiredImgs) {
-        if (!findImageForName(r)) missing.push(r);
+      if (!useMerged) {
+        const missing = [];
+        for (const r of requiredImgs) {
+          if (!findImageForName(r)) missing.push(r);
+        }
+        if (missing.length) {
+          log(`Missing required images: ${missing.join(', ')}`);
+          if (progressLabel) progressLabel.textContent = 'Add required images.';
+          return;
+        }
+        completeProgress('Images validated');
       }
-      if (missing.length) {
-        log(`Missing required images: ${missing.join(', ')}`);
-        if (progressLabel) progressLabel.textContent = 'Add required images.';
-        return;
-      }
-      completeProgress('Images validated');
 
       let loaderBuf;
       let loaderName;
@@ -855,68 +877,110 @@ console.log('Flash info:', info);</code></pre>
         return;
       }
 
-      let info;
-      try {
-        info = await Module.readFlashInfo();
-        if (!info || info.flashSizeMiB === undefined) {
-          bumpTotalSteps(1);
-          append('ReadFlashInfo empty; attempting to load loader…');
-          append(`Loading loader ${loaderName}…`);
-          const dlOk = await Module.downloadBootBuffer(loaderBuf);
-          if (!dlOk) {
-            log('downloadBoot failed. Aborting.');
-            return;
-          }
-          completeProgress(`Loader ${loaderName} downloaded`);
-          append('Loader loaded, waiting for device to enumerate…');
+      if (useMerged) {
+        try {
           const dev = await waitForDevice(Module, ['loader', 'maskrom'], 20, 500);
           if (!dev) {
-            log('Loader loaded but device not detected.');
+            log('No Loader/Maskrom device detected.');
             return;
           }
-          append(`Device present (${dev.type}).`);
-          info = await Module.readFlashInfo();
-        }
-        if (info && info.flashSizeMiB !== undefined) {
-          append(`FlashInfo: manufacturer=${info.manufacturer} size=${info.flashSizeMiB}MiB`);
-        } else {
-          log('ReadFlashInfo returned empty result. Aborting.');
+          if ((dev.type || '').toLowerCase() !== 'loader') {
+            append(`Loading loader ${loaderName}…`);
+            const dlOk = await Module.downloadBootBuffer(loaderBuf);
+            if (!dlOk) {
+              log('downloadBoot failed. Aborting.');
+              return;
+            }
+            append('Loader loaded, waiting for device to enumerate…');
+            const dev2 = await waitForDevice(Module, ['loader'], 20, 500);
+            if (!dev2) {
+              log('Loader loaded but device not detected.');
+              return;
+            }
+            append(`Device present (${dev2.type}).`);
+          }
+          completeProgress(`Loader ${loaderName} ready`);
+        } catch (err) {
+          log(`Loader load failed (${err?.message || err}). Aborting.`);
           return;
         }
-      } catch (err) {
-        log(`ReadFlashInfo failed (${err?.message || err}). Aborting.`);
-        return;
-      }
-      completeProgress('Flash info read');
-
-      const erased = await eraseFlashWithLog(Module);
-      if (!erased) return;
-      completeProgress('Erase flash complete');
-
-      for (const part of parts) {
-        const nameLower = part.name.toLowerCase();
-        const f = findImageForName(nameLower);
-        if (!f) {
-          append(`Skipping ${part.name} (no matching image).`);
-          continue;
-        }
-        if (!needed.includes(nameLower)) {
-          append(`Skipping ${part.name} (not in required list).`);
-          continue;
-        }
-        const data = await readFileAsUint8Array(f);
-        append(`Writing ${part.name} (${data.byteLength} bytes) @ LBA ${part.startLba}…`);
+        const data = await readFileAsUint8Array(mergedImg);
+        append(`Writing ${mergedImg.name} (${data.byteLength} bytes) @ LBA 0…`);
         try {
-          const ok = await Module.writeLba(part.startLba, data);
+          const ok = await Module.writeLba(0, data);
           if (!ok) {
-            log(`WriteLBA failed for ${part.name}. Aborting.`);
+            log('WriteLBA failed for merged image. Aborting.');
             return;
           }
         } catch (err) {
-          log(`WriteLBA threw for ${part.name}: ${err?.message || err}. Aborting.`);
+          log(`WriteLBA threw for merged image: ${err?.message || err}. Aborting.`);
           return;
         }
-        completeProgress(`Flashed ${part.name}`);
+        completeProgress('Flashed merged image');
+      } else {
+        let info;
+        try {
+          info = await Module.readFlashInfo();
+          if (!info || info.flashSizeMiB === undefined) {
+            bumpTotalSteps(1);
+            append('ReadFlashInfo empty; attempting to load loader…');
+            append(`Loading loader ${loaderName}…`);
+            const dlOk = await Module.downloadBootBuffer(loaderBuf);
+            if (!dlOk) {
+              log('downloadBoot failed. Aborting.');
+              return;
+            }
+            completeProgress(`Loader ${loaderName} downloaded`);
+            append('Loader loaded, waiting for device to enumerate…');
+            const dev = await waitForDevice(Module, ['loader', 'maskrom'], 20, 500);
+            if (!dev) {
+              log('Loader loaded but device not detected.');
+              return;
+            }
+            append(`Device present (${dev.type}).`);
+            info = await Module.readFlashInfo();
+          }
+          if (info && info.flashSizeMiB !== undefined) {
+            append(`FlashInfo: manufacturer=${info.manufacturer} size=${info.flashSizeMiB}MiB`);
+          } else {
+            log('ReadFlashInfo returned empty result. Aborting.');
+            return;
+          }
+        } catch (err) {
+          log(`ReadFlashInfo failed (${err?.message || err}). Aborting.`);
+          return;
+        }
+        completeProgress('Flash info read');
+
+        const erased = await eraseFlashWithLog(Module);
+        if (!erased) return;
+        completeProgress('Erase flash complete');
+
+        for (const part of parts) {
+          const nameLower = part.name.toLowerCase();
+          const f = findImageForName(nameLower);
+          if (!f) {
+            append(`Skipping ${part.name} (no matching image).`);
+            continue;
+          }
+          if (!needed.includes(nameLower)) {
+            append(`Skipping ${part.name} (not in required list).`);
+            continue;
+          }
+          const data = await readFileAsUint8Array(f);
+          append(`Writing ${part.name} (${data.byteLength} bytes) @ LBA ${part.startLba}…`);
+          try {
+            const ok = await Module.writeLba(part.startLba, data);
+            if (!ok) {
+              log(`WriteLBA failed for ${part.name}. Aborting.`);
+              return;
+            }
+          } catch (err) {
+            log(`WriteLBA threw for ${part.name}: ${err?.message || err}. Aborting.`);
+            return;
+          }
+          completeProgress(`Flashed ${part.name}`);
+        }
       }
 
       append('Issuing reset…');
@@ -937,24 +1001,33 @@ console.log('Flash info:', info);</code></pre>
       log('Loading WASM…');
       const Module = await modulePromise;
 
-      // Validate files
-      const missing = [];
-      for (const r of requiredImgs) {
-        if (!findImageForName(r)) missing.push(r);
-      }
-      if (missing.length) {
-        log(`Missing required images: ${missing.join(', ')}`);
-        return;
-      }
+      const imgFiles = getImageFiles();
+      const useMerged = imgFiles.length === 1;
+      const mergedImg = useMerged ? imgFiles[0] : null;
+
       let parts;
-      try {
-        parts = await ensureParts();
-      } catch (err) {
-        log(err.message || String(err));
-        return;
+      let needed = [];
+      if (!useMerged) {
+        // Validate files
+        const missing = [];
+        for (const r of requiredImgs) {
+          if (!findImageForName(r)) missing.push(r);
+        }
+        if (missing.length) {
+          log(`Missing required images: ${missing.join(', ')}`);
+          return;
+        }
+        try {
+          parts = await ensureParts();
+        } catch (err) {
+          log(err.message || String(err));
+          return;
+        }
+        needed = requiredImgs.filter(n => parts.find(p => p.name.toLowerCase() === n));
+        append(`Found mtdparts: ${parts.map(p => `${p.name}@${p.startLba}`).join(', ')}`);
+      } else {
+        append(`Using single image ${mergedImg.name}`);
       }
-      const needed = requiredImgs.filter(n => parts.find(p => p.name.toLowerCase() === n));
-      append(`Found mtdparts: ${parts.map(p => `${p.name}@${p.startLba}`).join(', ')}`);
 
       // Require an already-loaded device (loader or maskrom)
       const dev = await waitForDevice(Module, ['loader', 'maskrom'], 20, 500);
@@ -964,46 +1037,65 @@ console.log('Flash info:', info);</code></pre>
       }
       append(`Using detected device (${dev.type}).`);
 
-      // Probe flash info (mandatory)
-      try {
-        const info = await Module.readFlashInfo();
-        if (info && info.flashSizeMiB !== undefined) {
-          append(`FlashInfo: manufacturer=${info.manufacturer} size=${info.flashSizeMiB}MiB`);
-        } else {
-          log('ReadFlashInfo returned empty result. Aborting.');
+      if (useMerged) {
+        if ((dev.type || '').toLowerCase() !== 'loader') {
+          log('Merged image flashing requires loader mode. Load the loader first.');
           return;
         }
-      } catch (err) {
-        log(`ReadFlashInfo failed (${err?.message || err}). Aborting.`);
-        return;
-      }
-
-      const erased = await eraseFlashWithLog(Module);
-      if (!erased) return;
-
-      // Flash partitions
-      for (const part of parts) {
-        const nameLower = part.name.toLowerCase();
-        const f = findImageForName(nameLower);
-        if (!f) {
-          append(`Skipping ${part.name} (no matching image).`);
-          continue;
-        }
-        if (!needed.includes(nameLower)) {
-          append(`Skipping ${part.name} (not in required list).`);
-          continue;
-        }
-        const data = await readFileAsUint8Array(f);
-        append(`Writing ${part.name} (${data.byteLength} bytes) @ LBA ${part.startLba}…`);
+        const data = await readFileAsUint8Array(mergedImg);
+        append(`Writing ${mergedImg.name} (${data.byteLength} bytes) @ LBA 0…`);
         try {
-          const ok = await Module.writeLba(part.startLba, data);
+          const ok = await Module.writeLba(0, data);
           if (!ok) {
-            log(`WriteLBA failed for ${part.name}. Aborting.`);
+            log('WriteLBA failed for merged image. Aborting.');
             return;
           }
         } catch (err) {
-          log(`WriteLBA threw for ${part.name}: ${err?.message || err}. Aborting.`);
+          log(`WriteLBA threw for merged image: ${err?.message || err}. Aborting.`);
           return;
+        }
+      } else {
+        // Probe flash info (mandatory)
+        try {
+          const info = await Module.readFlashInfo();
+          if (info && info.flashSizeMiB !== undefined) {
+            append(`FlashInfo: manufacturer=${info.manufacturer} size=${info.flashSizeMiB}MiB`);
+          } else {
+            log('ReadFlashInfo returned empty result. Aborting.');
+            return;
+          }
+        } catch (err) {
+          log(`ReadFlashInfo failed (${err?.message || err}). Aborting.`);
+          return;
+        }
+
+        const erased = await eraseFlashWithLog(Module);
+        if (!erased) return;
+
+        // Flash partitions
+        for (const part of parts) {
+          const nameLower = part.name.toLowerCase();
+          const f = findImageForName(nameLower);
+          if (!f) {
+            append(`Skipping ${part.name} (no matching image).`);
+            continue;
+          }
+          if (!needed.includes(nameLower)) {
+            append(`Skipping ${part.name} (not in required list).`);
+            continue;
+          }
+          const data = await readFileAsUint8Array(f);
+          append(`Writing ${part.name} (${data.byteLength} bytes) @ LBA ${part.startLba}…`);
+          try {
+            const ok = await Module.writeLba(part.startLba, data);
+            if (!ok) {
+              log(`WriteLBA failed for ${part.name}. Aborting.`);
+              return;
+            }
+          } catch (err) {
+            log(`WriteLBA threw for ${part.name}: ${err?.message || err}. Aborting.`);
+            return;
+          }
         }
       }
 
