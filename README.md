@@ -28,6 +28,10 @@ I wanted to develop an easy way for users of my [Embedded SLAM Camera](https://x
 - `await Module.resetDevice(subcode: number) -> bool`: resets the device with a subcode (commonly `0`).
 - `await Module.testDevice() -> bool`: basic connectivity test.
 
+## Signed Images
+
+See [IMAGE_SIGNING.md](IMAGE_SIGNING.md) for the offline Rockchip signing flow, key generation, public key hash burning notes, and how to flash signed outputs with the browser UI.
+
 ### Minimal usage example
 ```js
 import createModule from './rkDevelopTool_Mac.js';
